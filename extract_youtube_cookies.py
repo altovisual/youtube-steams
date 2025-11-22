@@ -50,7 +50,7 @@ def extract_youtube_cookies(input_file, output_file):
         sys.exit(1)
 
 if __name__ == '__main__':
-    input_file = '95f608f8-5ce2-4786-9340-8b5e5eeee403.txt'
+    input_file = 'ac604855-9a7d-45c7-a427-dad350b4426a.txt'
     output_file = 'youtube_cookies_only.txt'
     
     extract_youtube_cookies(input_file, output_file)

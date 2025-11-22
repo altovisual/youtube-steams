@@ -12,6 +12,7 @@ import json
 import re
 from datetime import datetime
 import config
+from proxy_manager import proxy_manager
 
 app = FastAPI(title="YouTube Music Downloader API")
 
@@ -31,9 +32,16 @@ STEMS_DIR = config.STEMS_DIR
 # Store metadata for downloaded files
 file_metadata = {}
 
-def get_ytdlp_opts_with_cookies(base_opts: dict) -> dict:
-    """Add cookies to yt-dlp options if configured"""
+def get_ytdlp_opts_with_cookies(base_opts: dict, use_proxy: bool = True) -> dict:
+    """Add cookies and proxy to yt-dlp options if configured"""
     opts = base_opts.copy()
+    
+    # Try to use proxy first (más confiable que cookies)
+    if use_proxy and not config.PROXY_URL:
+        proxy = proxy_manager.get_random_proxy()
+        if proxy:
+            opts['proxy'] = proxy
+            print(f"🔄 Using public proxy: {proxy}")
     
     # Check if cookies are in environment variable (for Render)
     cookies_content = os.getenv('YOUTUBE_COOKIES')
@@ -64,7 +72,7 @@ def get_ytdlp_opts_with_cookies(base_opts: dict) -> dict:
         opts['cookiefile'] = config.YOUTUBE_COOKIES_FILE
         print(f"Using cookies from file: {config.YOUTUBE_COOKIES_FILE}")
     else:
-        print("No cookies configured - may encounter bot detection")
+        print("⚠️ No cookies configured - using only proxy")
     
     return opts
 

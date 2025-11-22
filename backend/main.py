@@ -10,6 +10,7 @@ import asyncio
 from typing import Optional
 import json
 import re
+from datetime import datetime
 import config
 
 app = FastAPI(title="YouTube Music Downloader API")
@@ -58,6 +59,15 @@ class SeparateRequest(BaseModel):
 @app.get("/")
 async def root():
     return {"message": "YouTube Music Downloader API", "status": "running"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint para mantener el servicio activo"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "youtube-steams-backend"
+    }
 
 @app.get("/api/test-stems")
 async def test_stems():

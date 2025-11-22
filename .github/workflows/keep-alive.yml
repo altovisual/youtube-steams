@@ -1,0 +1,27 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    # Ejecutar cada 10 minutos (evita que el servicio se duerma)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Permitir ejecución manual desde GitHub
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Backend Health Endpoint
+        run: |
+          echo "Pinging backend at $(date)"
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://youtube-steams-backend.onrender.com/health)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend is alive! Response code: $response"
+          else
+            echo "⚠️ Backend returned code: $response"
+            exit 1
+          fi
+      
+      - name: Log Timestamp
+        run: echo "Last ping at $(date '+%Y-%m-%d %H:%M:%S UTC')"

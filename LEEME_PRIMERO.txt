@@ -1,0 +1,166 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║              🎵 YOUTUBE MUSIC DOWNLOADER 🎵                          ║
+║                                                                      ║
+║              ¡Bienvenido a tu descargador de música!                ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+📋 INICIO RÁPIDO (5 MINUTOS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Instala FFmpeg:
+   - Abre PowerShell como administrador
+   - Ejecuta: choco install ffmpeg
+   
+2. Instala dependencias:
+   - Haz doble clic en: install.bat
+   
+3. Inicia la aplicación:
+   - Haz doble clic en: start.bat
+   - Abre tu navegador en: http://localhost:5173
+
+
+✨ CARACTERÍSTICAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Descarga música de YouTube en MP3 320kbps
+✅ Separa stems con IA (vocals, drums, bass, other)
+✅ Interfaz hermosa y moderna
+✅ Muestra cover y metadata de la canción
+✅ 100% gratis y local
+✅ Sin publicidad ni límites
+
+
+📚 DOCUMENTACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 INDEX.md              → Índice completo de toda la documentación
+⚡ QUICKSTART.md         → Inicio rápido (5 minutos)
+📖 INSTRUCCIONES.md      → Guía de instalación detallada
+📘 README.md             → Documentación completa
+🎬 DEMO.md               → Demo y características visuales
+📁 ESTRUCTURA.md         → Estructura del proyecto
+🛠️ TROUBLESHOOTING.md    → Solución de problemas
+💻 TECHNICAL.md          → Documentación técnica
+
+
+🎯 ¿POR DÓNDE EMPIEZO?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si eres NUEVO:
+  1. Lee QUICKSTART.md (2 minutos)
+  2. Ejecuta install.bat
+  3. Ejecuta start.bat
+  4. ¡Disfruta!
+
+Si tienes PROBLEMAS:
+  1. Lee TROUBLESHOOTING.md
+  2. Verifica que FFmpeg esté instalado
+  3. Revisa los logs en las terminales
+
+Si eres DESARROLLADOR:
+  1. Lee INDEX.md
+  2. Luego TECHNICAL.md
+  3. Revisa el código fuente
+
+
+⚠️ REQUISITOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Windows 10/11
+✅ Python 3.9+ (se instala automáticamente)
+✅ Node.js 18+ (se instala automáticamente)
+✅ FFmpeg (debes instalarlo manualmente)
+✅ 5GB de espacio en disco
+✅ Conexión a internet
+
+
+🚀 COMANDOS RÁPIDOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Instalar todo:
+  → Doble clic en install.bat
+
+Iniciar aplicación:
+  → Doble clic en start.bat
+
+Iniciar solo backend:
+  → cd backend
+  → venv\Scripts\activate
+  → python main.py
+
+Iniciar solo frontend:
+  → cd frontend
+  → npm run dev
+
+
+💡 TIPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• La separación de stems toma 2-5 minutos (es normal)
+• Usa canciones de menos de 5 minutos para empezar
+• Mantén las ventanas de terminal abiertas
+• Los archivos se guardan en backend/downloads y backend/stems
+
+
+🎵 EJEMPLO DE USO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Copia un link de YouTube
+2. Pégalo en el input de la app
+3. Haz clic en buscar 🔍
+4. Haz clic en "Descargar Audio MP3" 📥
+5. (Opcional) Haz clic en "Separar Stems" 🎼
+6. ¡Disfruta tu música! 🎉
+
+
+📞 AYUDA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Si tienes problemas:
+  1. Lee TROUBLESHOOTING.md
+  2. Verifica que seguiste todos los pasos
+  3. Revisa los logs en las terminales
+  4. Busca el error en Google
+
+
+🌟 STACK TECNOLÓGICO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Backend:  FastAPI + yt-dlp + Demucs + PyTorch
+Frontend: React + Vite + TailwindCSS + Lucide
+Tools:    FFmpeg + Python + Node.js
+
+
+🎨 CARACTERÍSTICAS VISUALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Gradiente vibrante (azul → púrpura → rosa)
+• Cards con glassmorphism
+• Animaciones suaves
+• Diseño moderno inspirado en Genius
+• Responsive (funciona en móvil)
+
+
+⚖️ LEGAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Respeta los derechos de autor
+• Usa solo para contenido que tengas permiso
+• Esta herramienta es para uso personal
+• No redistribuyas contenido descargado
+
+
+🎉 ¡DISFRUTA!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Este proyecto fue creado con ❤️ para hacer tu vida más fácil.
+
+¡Que disfrutes tu música! 🎵✨
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Versión 1.0.0 | Noviembre 2024 | Creado con Cascade AI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

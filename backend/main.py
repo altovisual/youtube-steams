@@ -69,6 +69,37 @@ async def health_check():
         "service": "youtube-steams-backend"
     }
 
+@app.get("/api/test-youtube")
+async def test_youtube():
+    """Test endpoint to verify YouTube extraction works"""
+    test_url = "https://www.youtube.com/watch?v=jNQXAC9IVRw"  # Me at the zoo - primer video de YouTube
+    
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'noplaylist': True,
+            **config.YTDLP_EXTRA_OPTS,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(test_url, download=False)
+            
+        return {
+            "status": "success",
+            "title": info.get('title'),
+            "duration": info.get('duration'),
+            "extractor": info.get('extractor'),
+            "player_client": "android_creator"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "config": config.YTDLP_EXTRA_OPTS
+        }
+
 @app.get("/api/test-stems")
 async def test_stems():
     """Test endpoint to verify Demucs configuration"""

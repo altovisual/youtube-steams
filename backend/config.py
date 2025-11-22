@@ -35,15 +35,20 @@ AUDIO_QUALITY = "0"  # 0 = mejor calidad VBR (Variable Bit Rate)
 AUDIO_FORMAT = "mp3"
 AUDIO_BITRATE = "320k"  # Bitrate fijo para MP3
 
-# yt-dlp extra options to bypass bot detection - USAR SOLO CLIENTE ANDROID
+# yt-dlp extra options to bypass bot detection
 YTDLP_EXTRA_OPTS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': {
-            'player_client': ['android_creator'],  # Cliente Android Creator es el más confiable
-            'player_skip': ['webpage'],
+            # Usar múltiples clientes como fallback
+            'player_client': ['android_creator', 'android', 'ios', 'mweb'],
+            'player_skip': ['webpage', 'configs'],
+            'skip': ['hls', 'dash'],  # Skip formatos que requieren más verificación
         }
     },
+    # Opciones adicionales para evitar detección
+    'socket_timeout': 30,
+    'source_address': '0.0.0.0',  # Bind to all interfaces
 }
 
 # Video download configuration - ALTA CALIDAD

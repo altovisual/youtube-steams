@@ -38,11 +38,25 @@ def get_ytdlp_opts_with_cookies(base_opts: dict) -> dict:
     # Check if cookies are in environment variable (for Render)
     cookies_content = os.getenv('YOUTUBE_COOKIES')
     if cookies_content:
-        # Write cookies to temporary file
-        temp_cookies_file = DOWNLOADS_DIR / 'temp_cookies.txt'
-        temp_cookies_file.write_text(cookies_content)
-        opts['cookiefile'] = str(temp_cookies_file)
-        print(f"Using cookies from environment variable")
+        try:
+            # Write cookies to temporary file
+            temp_cookies_file = DOWNLOADS_DIR / 'temp_cookies.txt'
+            # Filter only YouTube cookies to reduce size
+            youtube_cookies = []
+            for line in cookies_content.split('\n'):
+                if line.strip() and not line.startswith('#'):
+                    # Only keep youtube.com cookies
+                    if 'youtube.com' in line or 'googlevideo.com' in line:
+                        youtube_cookies.append(line)
+            
+            if youtube_cookies:
+                temp_cookies_file.write_text('\n'.join(youtube_cookies))
+                opts['cookiefile'] = str(temp_cookies_file)
+                print(f"Using {len(youtube_cookies)} YouTube cookies from environment variable")
+            else:
+                print("No YouTube cookies found in environment variable")
+        except Exception as e:
+            print(f"Error processing cookies from environment: {e}")
     # Add cookies from browser if configured
     elif config.YOUTUBE_COOKIES_BROWSER:
         opts['cookiesfrombrowser'] = (config.YOUTUBE_COOKIES_BROWSER,)

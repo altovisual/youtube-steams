@@ -35,8 +35,16 @@ def get_ytdlp_opts_with_cookies(base_opts: dict) -> dict:
     """Add cookies to yt-dlp options if configured"""
     opts = base_opts.copy()
     
+    # Check if cookies are in environment variable (for Render)
+    cookies_content = os.getenv('YOUTUBE_COOKIES')
+    if cookies_content:
+        # Write cookies to temporary file
+        temp_cookies_file = DOWNLOADS_DIR / 'temp_cookies.txt'
+        temp_cookies_file.write_text(cookies_content)
+        opts['cookiefile'] = str(temp_cookies_file)
+        print(f"Using cookies from environment variable")
     # Add cookies from browser if configured
-    if config.YOUTUBE_COOKIES_BROWSER:
+    elif config.YOUTUBE_COOKIES_BROWSER:
         opts['cookiesfrombrowser'] = (config.YOUTUBE_COOKIES_BROWSER,)
         print(f"Using cookies from browser: {config.YOUTUBE_COOKIES_BROWSER}")
     # Or from file if configured

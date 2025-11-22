@@ -38,3 +38,9 @@ yarn-error.log*
 # Environment
 .env
 .env.local
+
+# Cookies (contienen tokens sensibles)
+*.txt
+!requirements.txt
+!LEEME_PRIMERO.txt
+!README.txt

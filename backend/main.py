@@ -101,10 +101,10 @@ async def get_video_info(video: VideoURL):
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'nocheckcertificate': True,
             'ignoreerrors': False,
             'no_color': True,
             'noplaylist': True,  # IMPORTANTE: Solo descargar el video, no la playlist
+            **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
         }
         
         print(f"Fetching info for URL: {video.url}")
@@ -167,6 +167,7 @@ async def download_audio(video: VideoURL):
                     '-ar', '48000',  # Sample rate 48kHz (alta calidad)
                 ]
             },
+            **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
         }
         
         print(f"Downloading audio: {video.url}")
@@ -224,6 +225,7 @@ async def download_video(video: VideoURL):
                     '-threads', str(config.FFMPEG_THREADS),
                 ]
             },
+            **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
         }
         
         print(f"Downloading video: {video.url}")

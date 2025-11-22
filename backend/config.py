@@ -35,6 +35,13 @@ AUDIO_QUALITY = "0"  # 0 = mejor calidad VBR (Variable Bit Rate)
 AUDIO_FORMAT = "mp3"
 AUDIO_BITRATE = "320k"  # Bitrate fijo para MP3
 
+# yt-dlp extra options to bypass bot detection
+YTDLP_EXTRA_OPTS = {
+    'nocheckcertificate': True,
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+}
+
 # Video download configuration - ALTA CALIDAD
 VIDEO_FORMAT = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"  # Mejor video + audio en MP4
 VIDEO_QUALITY = "1080"  # Máxima resolución preferida

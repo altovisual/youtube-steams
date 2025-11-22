@@ -39,24 +39,22 @@ def get_ytdlp_opts_with_cookies(base_opts: dict) -> dict:
     cookies_content = os.getenv('YOUTUBE_COOKIES')
     if cookies_content:
         try:
-            # Write cookies to temporary file
+            print(f"Found YOUTUBE_COOKIES environment variable (length: {len(cookies_content)} chars)")
+            # Write cookies to temporary file with proper Netscape format
             temp_cookies_file = DOWNLOADS_DIR / 'temp_cookies.txt'
-            # Filter only YouTube cookies to reduce size
-            youtube_cookies = []
-            for line in cookies_content.split('\n'):
-                if line.strip() and not line.startswith('#'):
-                    # Only keep youtube.com cookies
-                    if 'youtube.com' in line or 'googlevideo.com' in line:
-                        youtube_cookies.append(line)
             
-            if youtube_cookies:
-                temp_cookies_file.write_text('\n'.join(youtube_cookies))
-                opts['cookiefile'] = str(temp_cookies_file)
-                print(f"Using {len(youtube_cookies)} YouTube cookies from environment variable")
-            else:
-                print("No YouTube cookies found in environment variable")
+            # Write entire content (should already have Netscape header)
+            temp_cookies_file.write_text(cookies_content, encoding='utf-8')
+            opts['cookiefile'] = str(temp_cookies_file)
+            
+            # Count non-comment lines
+            cookie_lines = [line for line in cookies_content.split('\n') if line.strip() and not line.startswith('#')]
+            print(f"✅ Using cookies file with {len(cookie_lines)} cookie entries")
+            print(f"📁 Cookies written to: {temp_cookies_file}")
         except Exception as e:
-            print(f"Error processing cookies from environment: {e}")
+            print(f"❌ Error processing cookies from environment: {e}")
+            import traceback
+            traceback.print_exc()
     # Add cookies from browser if configured
     elif config.YOUTUBE_COOKIES_BROWSER:
         opts['cookiesfrombrowser'] = (config.YOUTUBE_COOKIES_BROWSER,)

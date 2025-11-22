@@ -19,6 +19,9 @@ STEMS_DIR.mkdir(exist_ok=True)
 YOUTUBE_COOKIES_FILE = os.getenv('YOUTUBE_COOKIES_FILE', str(BASE_DIR / 'cookies.txt'))
 YOUTUBE_COOKIES_BROWSER = os.getenv('YOUTUBE_COOKIES_BROWSER', None)  # chrome, firefox, etc.
 
+# Proxy configuration (para evitar bot detection)
+PROXY_URL = os.getenv('PROXY_URL', None)  # Ejemplo: http://user:pass@proxy.com:port
+
 # Server configuration
 HOST = "0.0.0.0"
 PORT = 8000
@@ -55,6 +58,11 @@ YTDLP_EXTRA_OPTS = {
     'socket_timeout': 30,
     'source_address': '0.0.0.0',  # Bind to all interfaces
 }
+
+# Add proxy if configured
+if PROXY_URL:
+    YTDLP_EXTRA_OPTS['proxy'] = PROXY_URL
+    print(f"✅ Using proxy: {PROXY_URL.split('@')[1] if '@' in PROXY_URL else PROXY_URL}")
 
 # Video download configuration - ALTA CALIDAD
 VIDEO_FORMAT = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"  # Mejor video + audio en MP4

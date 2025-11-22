@@ -17,14 +17,24 @@ def extract_youtube_cookies(input_file, output_file):
     
     try:
         with open(input_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                line_stripped = line.strip()
-                # Skip existing headers
-                if line_stripped.startswith('#'):
-                    continue
-                # Keep only YouTube and Google cookies
-                if line_stripped and ('youtube.com' in line_stripped or 'googlevideo.com' in line_stripped or '.google.com' in line_stripped):
-                    youtube_cookies.append(line_stripped)
+            content = f.read()
+            
+        # Split by any whitespace and reconstruct proper lines
+        # Netscape format: domain flag path secure expiration name value (TAB separated)
+        lines = content.split('\n')
+        for line in lines:
+            line_stripped = line.strip()
+            # Skip existing headers and empty lines
+            if not line_stripped or line_stripped.startswith('#'):
+                continue
+            # Keep only YouTube and Google cookies
+            if 'youtube.com' in line_stripped or 'googlevideo.com' in line_stripped or '.google.com' in line_stripped:
+                # Ensure proper tab separation (replace multiple spaces/tabs with single tab)
+                parts = line_stripped.split()
+                if len(parts) >= 7:  # Valid cookie line has at least 7 fields
+                    # Reconstruct with tabs: domain, flag, path, secure, expiration, name, value
+                    cookie_line = '\t'.join(parts[:7])
+                    youtube_cookies.append(cookie_line)
         
         # Write filtered cookies
         with open(output_file, 'w', encoding='utf-8', newline='\n') as f:

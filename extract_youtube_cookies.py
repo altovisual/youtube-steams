@@ -9,23 +9,29 @@ def extract_youtube_cookies(input_file, output_file):
     """Extract only YouTube-related cookies from a large cookies file"""
     youtube_cookies = []
     
+    # Add Netscape header (required format)
+    youtube_cookies.append('# Netscape HTTP Cookie File')
+    youtube_cookies.append('# https://curl.haxx.se/rfc/cookie_spec.html')
+    youtube_cookies.append('# This is a generated file! Do not edit.')
+    youtube_cookies.append('')
+    
     try:
         with open(input_file, 'r', encoding='utf-8') as f:
             for line in f:
-                line = line.strip()
-                # Keep header comments
-                if line.startswith('#'):
-                    if 'Netscape' in line or 'HTTP Cookie' in line:
-                        youtube_cookies.append(line)
-                # Keep only YouTube and Google Video cookies
-                elif 'youtube.com' in line or 'googlevideo.com' in line or 'google.com' in line:
-                    youtube_cookies.append(line)
+                line_stripped = line.strip()
+                # Skip existing headers
+                if line_stripped.startswith('#'):
+                    continue
+                # Keep only YouTube and Google cookies
+                if line_stripped and ('youtube.com' in line_stripped or 'googlevideo.com' in line_stripped or '.google.com' in line_stripped):
+                    youtube_cookies.append(line_stripped)
         
         # Write filtered cookies
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, 'w', encoding='utf-8', newline='\n') as f:
             f.write('\n'.join(youtube_cookies))
         
-        print(f"✅ Extraídas {len(youtube_cookies)} cookies de YouTube")
+        cookie_count = len(youtube_cookies) - 4  # Subtract header lines
+        print(f"✅ Extraídas {cookie_count} cookies de YouTube")
         print(f"📁 Guardadas en: {output_file}")
         print(f"\n📋 Ahora copia el contenido de '{output_file}' a la variable YOUTUBE_COOKIES en Render")
         

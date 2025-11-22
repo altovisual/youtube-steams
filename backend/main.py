@@ -31,6 +31,23 @@ STEMS_DIR = config.STEMS_DIR
 # Store metadata for downloaded files
 file_metadata = {}
 
+def get_ytdlp_opts_with_cookies(base_opts: dict) -> dict:
+    """Add cookies to yt-dlp options if configured"""
+    opts = base_opts.copy()
+    
+    # Add cookies from browser if configured
+    if config.YOUTUBE_COOKIES_BROWSER:
+        opts['cookiesfrombrowser'] = (config.YOUTUBE_COOKIES_BROWSER,)
+        print(f"Using cookies from browser: {config.YOUTUBE_COOKIES_BROWSER}")
+    # Or from file if configured
+    elif config.YOUTUBE_COOKIES_FILE and Path(config.YOUTUBE_COOKIES_FILE).exists():
+        opts['cookiefile'] = config.YOUTUBE_COOKIES_FILE
+        print(f"Using cookies from file: {config.YOUTUBE_COOKIES_FILE}")
+    else:
+        print("No cookies configured - may encounter bot detection")
+    
+    return opts
+
 def sanitize_filename(filename: str) -> str:
     """Clean filename to be safe for file systems"""
     # Remove invalid characters
@@ -138,7 +155,7 @@ async def test_stems():
 async def get_video_info(video: VideoURL):
     """Get video information including title, artist, thumbnail, duration"""
     try:
-        ydl_opts = {
+        base_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
@@ -147,6 +164,9 @@ async def get_video_info(video: VideoURL):
             'noplaylist': True,  # IMPORTANTE: Solo descargar el video, no la playlist
             **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
         }
+        
+        # Add cookies if configured
+        ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
         
         print(f"Fetching info for URL: {video.url}")
         

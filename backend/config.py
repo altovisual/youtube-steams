@@ -14,6 +14,10 @@ STEMS_DIR = BASE_DIR / "stems"
 DOWNLOADS_DIR.mkdir(exist_ok=True)
 STEMS_DIR.mkdir(exist_ok=True)
 
+# YouTube Cookies configuration (opcional)
+YOUTUBE_COOKIES_BROWSER = os.getenv('YOUTUBE_COOKIES_BROWSER', None)  # chrome, firefox, etc.
+YOUTUBE_COOKIES_FILE = os.getenv('YOUTUBE_COOKIES_FILE', None)  # Path to cookies.txt
+
 # Server configuration
 HOST = "0.0.0.0"
 PORT = 8000

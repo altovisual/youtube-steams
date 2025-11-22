@@ -7,6 +7,7 @@ import ParticlesBackground from './ParticlesBackground'
 import DownloadAnimation from './DownloadAnimation'
 import SuccessNotification from './SuccessNotification'
 import { useSound } from '../hooks/useSound'
+import { API_ENDPOINTS } from '../config/api'
 
 export default function VideoCard({ videoInfo }) {
   const [downloading, setDownloading] = useState(false)
@@ -26,7 +27,7 @@ export default function VideoCard({ videoInfo }) {
     setError('')
     setDownloading(true)
     try {
-      const response = await axios.post('/api/download', { 
+      const response = await axios.post(API_ENDPOINTS.download, { 
         url: `https://www.youtube.com/watch?v=${videoInfo.id}` 
       })
       setFileId(response.data.file_id)
@@ -43,7 +44,7 @@ export default function VideoCard({ videoInfo }) {
       })
       
       // Auto download file
-      window.open(`/api/download-file/${response.data.file_id}`, '_blank')
+      window.open(API_ENDPOINTS.downloadFile(response.data.file_id), '_blank')
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al descargar el audio')
     } finally {
@@ -55,7 +56,7 @@ export default function VideoCard({ videoInfo }) {
     setError('')
     setDownloadingVideo(true)
     try {
-      const response = await axios.post('/api/download-video', { 
+      const response = await axios.post(API_ENDPOINTS.downloadVideo, { 
         url: `https://www.youtube.com/watch?v=${videoInfo.id}` 
       })
       setVideoFileId(response.data.file_id)
@@ -72,7 +73,7 @@ export default function VideoCard({ videoInfo }) {
       })
       
       // Auto download file
-      window.open(`/api/download-video-file/${response.data.file_id}`, '_blank')
+      window.open(API_ENDPOINTS.downloadVideoFile(response.data.file_id), '_blank')
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al descargar el video')
     } finally {
@@ -91,7 +92,7 @@ export default function VideoCard({ videoInfo }) {
     setError('')
     setSeparating(true)
     try {
-      const response = await axios.post('/api/separate-stems', { 
+      const response = await axios.post(API_ENDPOINTS.separateStems, { 
         file_id: fileId,
         two_stems: twoStems
       })
@@ -120,7 +121,7 @@ export default function VideoCard({ videoInfo }) {
 
   const handleDownloadStem = (stemFileId) => {
     const [fId, stemName] = stemFileId.split('/')
-    window.open(`/api/download-stem/${fId}/${stemName.replace('.mp3', '')}`, '_blank')
+    window.open(API_ENDPOINTS.downloadStem(fId, stemName.replace('.mp3', '')), '_blank')
   }
 
   return (

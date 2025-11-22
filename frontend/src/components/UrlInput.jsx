@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Search, Loader2 } from 'lucide-react'
 import axios from 'axios'
+import { API_ENDPOINTS } from '../config/api'
 import { cn } from '../lib/utils'
 
 export default function UrlInput({ onVideoInfo, loading, setLoading }) {
@@ -18,7 +19,7 @@ export default function UrlInput({ onVideoInfo, loading, setLoading }) {
 
     setLoading(true)
     try {
-      const response = await axios.post('/api/video-info', { url })
+      const response = await axios.post(API_ENDPOINTS.videoInfo, { url })
       onVideoInfo(response.data)
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al obtener información del video')

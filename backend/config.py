@@ -24,6 +24,9 @@ CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
+    "https://youtube-steams.vercel.app",
+    "https://youtube-steams-frontend.onrender.com",
+    "https://*.vercel.app",  # Permitir todos los subdominios de Vercel
 ]
 
 # yt-dlp configuration - MÁXIMA CALIDAD

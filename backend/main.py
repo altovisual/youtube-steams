@@ -335,6 +335,17 @@ def download_audio_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
         'noplaylist': True,
         'nocheckcertificate': True,
         'socket_timeout': 30,
+        # Opciones para bypass de bot detection
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web'],  # iOS client suele funcionar mejor
+                'player_skip': ['webpage', 'configs'],
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
     }
     
     ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
@@ -447,6 +458,17 @@ def download_video_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
         'merge_output_format': 'mp4',
         'nocheckcertificate': True,
         'socket_timeout': 30,
+        # Opciones para bypass de bot detection
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'web'],
+                'player_skip': ['webpage', 'configs'],
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
     }
     
     ydl_opts = get_ytdlp_opts_with_cookies(base_opts)

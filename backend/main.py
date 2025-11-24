@@ -287,49 +287,95 @@ async def get_video_info(video: VideoURL):
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Error al obtener información del video: {str(e)}")
 
+async def download_audio_cobalt(video_url: str, file_id: str) -> tuple[Path, str]:
+    """Intenta descargar audio usando Cobalt API"""
+    cobalt_response = await cobalt_service.get_download_url(
+        url=video_url,
+        download_mode="audio",
+        audio_format="mp3",
+        audio_bitrate="320"
+    )
+    
+    if cobalt_response.get("status") == "error":
+        error_msg = cobalt_response.get("error", {}).get("message", "Error desconocido")
+        raise Exception(f"Cobalt: {error_msg}")
+    
+    download_url = cobalt_response.get("url")
+    filename = cobalt_response.get("filename", "audio.mp3")
+    
+    if not download_url:
+        raise Exception("Cobalt: No se obtuvo URL de descarga")
+    
+    print(f"📥 Descargando desde Cobalt: {download_url[:60]}...")
+    
+    output_path = DOWNLOADS_DIR / f"{file_id}.mp3"
+    
+    async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+        response = await client.get(download_url)
+        response.raise_for_status()
+        
+        with open(output_path, 'wb') as f:
+            f.write(response.content)
+    
+    clean_title = sanitize_filename(filename.replace('.mp3', '').replace('.m4a', ''))
+    return output_path, clean_title
+
+def download_audio_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
+    """Fallback: descarga audio usando yt-dlp con cookies"""
+    base_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '320',
+        }],
+        'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+        'nocheckcertificate': True,
+        'socket_timeout': 30,
+    }
+    
+    ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_url, download=True)
+    
+    title = info.get('title', 'audio')
+    clean_title = sanitize_filename(title)
+    output_path = DOWNLOADS_DIR / f"{file_id}.mp3"
+    
+    return output_path, clean_title
+
 @app.post("/api/download")
 async def download_audio(video: VideoURL, request: Request, limit_status: dict = Depends(check_rate_limit)):
-    """Download audio from YouTube video usando Cobalt API"""
+    """Download audio from YouTube - intenta Cobalt primero, fallback a yt-dlp"""
     try:
         # Registrar la descarga
         rate_limiter.record_download(request)
         
         file_id = str(uuid.uuid4())
+        clean_title = None
         
-        print(f"🎵 Downloading audio via Cobalt: {video.url}")
+        print(f"🎵 Downloading audio: {video.url}")
         
-        # Usar Cobalt API para obtener URL de descarga
-        cobalt_response = await cobalt_service.get_download_url(
-            url=video.url,
-            download_mode="audio",
-            audio_format="mp3",
-            audio_bitrate="320"
-        )
-        
-        if cobalt_response.get("status") == "error":
-            error_msg = cobalt_response.get("error", {}).get("message", "Error desconocido")
-            raise Exception(f"Cobalt error: {error_msg}")
-        
-        download_url = cobalt_response.get("url")
-        filename = cobalt_response.get("filename", "audio.mp3")
-        
-        if not download_url:
-            raise Exception("No se obtuvo URL de descarga")
-        
-        print(f"📥 Descargando desde: {download_url[:50]}...")
-        
-        # Descargar el archivo
-        output_path = DOWNLOADS_DIR / f"{file_id}.mp3"
-        
-        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
-            response = await client.get(download_url)
-            response.raise_for_status()
+        # Intentar primero con Cobalt
+        try:
+            output_path, clean_title = await download_audio_cobalt(video.url, file_id)
+            print(f"✅ Downloaded via Cobalt: {clean_title}")
+        except Exception as cobalt_error:
+            print(f"⚠️ Cobalt failed: {cobalt_error}")
+            print(f"🔄 Trying yt-dlp fallback...")
             
-            with open(output_path, 'wb') as f:
-                f.write(response.content)
+            # Fallback a yt-dlp
+            try:
+                output_path, clean_title = download_audio_ytdlp(video.url, file_id)
+                print(f"✅ Downloaded via yt-dlp: {clean_title}")
+            except Exception as ytdlp_error:
+                print(f"❌ yt-dlp also failed: {ytdlp_error}")
+                raise Exception(f"No se pudo descargar. Cobalt: {cobalt_error} | yt-dlp: {ytdlp_error}")
         
-        # Extraer título del filename de Cobalt
-        clean_title = sanitize_filename(filename.replace('.mp3', '').replace('.m4a', ''))
         if not clean_title:
             clean_title = f"audio_{file_id[:8]}"
         
@@ -339,8 +385,6 @@ async def download_audio(video: VideoURL, request: Request, limit_status: dict =
             'filename': f"{clean_title}.mp3",
             'type': 'audio'
         }
-        
-        print(f"✅ Download complete: {clean_title}")
         
         # Obtener estado actualizado del límite
         updated_status = rate_limiter.get_status(request)
@@ -360,48 +404,90 @@ async def download_audio(video: VideoURL, request: Request, limit_status: dict =
         print(f"❌ Error downloading: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error downloading audio: {str(e)}")
 
+async def download_video_cobalt(video_url: str, file_id: str) -> tuple[Path, str]:
+    """Intenta descargar video usando Cobalt API"""
+    cobalt_response = await cobalt_service.get_download_url(
+        url=video_url,
+        download_mode="auto",
+        video_quality="1080"
+    )
+    
+    if cobalt_response.get("status") == "error":
+        error_msg = cobalt_response.get("error", {}).get("message", "Error desconocido")
+        raise Exception(f"Cobalt: {error_msg}")
+    
+    download_url = cobalt_response.get("url")
+    filename = cobalt_response.get("filename", "video.mp4")
+    
+    if not download_url:
+        raise Exception("Cobalt: No se obtuvo URL de descarga")
+    
+    print(f"📥 Descargando video desde Cobalt: {download_url[:60]}...")
+    
+    output_path = DOWNLOADS_DIR / f"{file_id}.mp4"
+    
+    async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:
+        response = await client.get(download_url)
+        response.raise_for_status()
+        
+        with open(output_path, 'wb') as f:
+            f.write(response.content)
+    
+    clean_title = sanitize_filename(filename.replace('.mp4', '').replace('.webm', ''))
+    return output_path, clean_title
+
+def download_video_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
+    """Fallback: descarga video usando yt-dlp con cookies"""
+    base_opts = {
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+        'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+        'merge_output_format': 'mp4',
+        'nocheckcertificate': True,
+        'socket_timeout': 30,
+    }
+    
+    ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_url, download=True)
+    
+    title = info.get('title', 'video')
+    clean_title = sanitize_filename(title)
+    output_path = DOWNLOADS_DIR / f"{file_id}.mp4"
+    
+    return output_path, clean_title
+
 @app.post("/api/download-video")
 async def download_video(video: VideoURL, request: Request, limit_status: dict = Depends(check_rate_limit)):
-    """Download video from YouTube usando Cobalt API"""
+    """Download video from YouTube - intenta Cobalt primero, fallback a yt-dlp"""
     try:
         # Registrar la descarga
         rate_limiter.record_download(request)
         
         file_id = str(uuid.uuid4())
+        clean_title = None
         
-        print(f"🎬 Downloading video via Cobalt: {video.url}")
+        print(f"🎬 Downloading video: {video.url}")
         
-        # Usar Cobalt API para obtener URL de descarga
-        cobalt_response = await cobalt_service.get_download_url(
-            url=video.url,
-            download_mode="auto",  # video + audio
-            video_quality="1080"
-        )
-        
-        if cobalt_response.get("status") == "error":
-            error_msg = cobalt_response.get("error", {}).get("message", "Error desconocido")
-            raise Exception(f"Cobalt error: {error_msg}")
-        
-        download_url = cobalt_response.get("url")
-        filename = cobalt_response.get("filename", "video.mp4")
-        
-        if not download_url:
-            raise Exception("No se obtuvo URL de descarga")
-        
-        print(f"📥 Descargando desde: {download_url[:50]}...")
-        
-        # Descargar el archivo
-        output_path = DOWNLOADS_DIR / f"{file_id}.mp4"
-        
-        async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:
-            response = await client.get(download_url)
-            response.raise_for_status()
+        # Intentar primero con Cobalt
+        try:
+            output_path, clean_title = await download_video_cobalt(video.url, file_id)
+            print(f"✅ Video downloaded via Cobalt: {clean_title}")
+        except Exception as cobalt_error:
+            print(f"⚠️ Cobalt failed: {cobalt_error}")
+            print(f"🔄 Trying yt-dlp fallback...")
             
-            with open(output_path, 'wb') as f:
-                f.write(response.content)
+            # Fallback a yt-dlp
+            try:
+                output_path, clean_title = download_video_ytdlp(video.url, file_id)
+                print(f"✅ Video downloaded via yt-dlp: {clean_title}")
+            except Exception as ytdlp_error:
+                print(f"❌ yt-dlp also failed: {ytdlp_error}")
+                raise Exception(f"No se pudo descargar. Cobalt: {cobalt_error} | yt-dlp: {ytdlp_error}")
         
-        # Extraer título del filename de Cobalt
-        clean_title = sanitize_filename(filename.replace('.mp4', '').replace('.webm', ''))
         if not clean_title:
             clean_title = f"video_{file_id[:8]}"
         
@@ -411,8 +497,6 @@ async def download_video(video: VideoURL, request: Request, limit_status: dict =
             'filename': f"{clean_title}.mp4",
             'type': 'video'
         }
-        
-        print(f"✅ Video download complete: {clean_title}")
         
         # Obtener estado actualizado del límite
         updated_status = rate_limiter.get_status(request)

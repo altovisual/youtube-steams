@@ -1,16 +1,22 @@
 """
 Cobalt API Service - Alternativa a yt-dlp para evitar bloqueos de YouTube
 https://github.com/imputnet/cobalt
+
+Nota: Cobalt API ahora requiere autenticación en la mayoría de instancias.
+Usamos instancias públicas disponibles con fallback a yt-dlp.
 """
 
 import httpx
 import os
 from typing import Optional, Dict, Any
 
-# Instancias públicas de Cobalt (fallback si una falla)
+# Instancias públicas de Cobalt que aún funcionan (actualizar si cambian)
+# Nota: La API oficial (api.cobalt.tools) ahora requiere API key
 COBALT_INSTANCES = [
-    "https://api.cobalt.tools",
-    "https://cobalt-api.hyper.lol",
+    "https://cobalt.api.timelessnesses.me",
+    "https://api.cobalt.best",
+    "https://cobalt-api.kwiatekmiki.com",
+    "https://dl.khyernet.xyz",
 ]
 
 class CobaltService:

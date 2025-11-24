@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 import yt_dlp
 import os
@@ -11,9 +11,11 @@ from typing import Optional
 import json
 import re
 from datetime import datetime
+import httpx
 import config
 from proxy_manager import proxy_manager
 from rate_limiter import rate_limiter, check_rate_limit
+from cobalt_service import cobalt_service
 
 app = FastAPI(title="YouTube Music Downloader API")
 
@@ -242,54 +244,49 @@ async def get_video_info(video: VideoURL):
 
 @app.post("/api/download")
 async def download_audio(video: VideoURL, request: Request, limit_status: dict = Depends(check_rate_limit)):
-    """Download audio from YouTube video - OPTIMIZADO PARA MÁXIMA CALIDAD Y VELOCIDAD"""
+    """Download audio from YouTube video usando Cobalt API"""
     try:
         # Registrar la descarga
         rate_limiter.record_download(request)
         
         file_id = str(uuid.uuid4())
+        
+        print(f"🎵 Downloading audio via Cobalt: {video.url}")
+        
+        # Usar Cobalt API para obtener URL de descarga
+        cobalt_response = await cobalt_service.get_download_url(
+            url=video.url,
+            download_mode="audio",
+            audio_format="mp3",
+            audio_bitrate="320"
+        )
+        
+        if cobalt_response.get("status") == "error":
+            error_msg = cobalt_response.get("error", {}).get("message", "Error desconocido")
+            raise Exception(f"Cobalt error: {error_msg}")
+        
+        download_url = cobalt_response.get("url")
+        filename = cobalt_response.get("filename", "audio.mp3")
+        
+        if not download_url:
+            raise Exception("No se obtuvo URL de descarga")
+        
+        print(f"📥 Descargando desde: {download_url[:50]}...")
+        
+        # Descargar el archivo
         output_path = DOWNLOADS_DIR / f"{file_id}.mp3"
         
-        base_opts = {
-            'format': 'bestaudio/best',  # Formato flexible - mejor audio disponible
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': config.AUDIO_FORMAT,
-                'preferredquality': config.AUDIO_QUALITY,
-            }, {
-                'key': 'FFmpegMetadata',  # Preservar metadata
-            }],
-            'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
-            'concurrent_fragment_downloads': 5,  # Descargas paralelas (más rápido)
-            'retries': 10,
-            'fragment_retries': 10,
-            'http_chunk_size': 10485760,  # 10MB chunks (más rápido)
-            'postprocessor_args': {
-                'ffmpeg': [
-                    '-threads', str(config.FFMPEG_THREADS),  # Usar todos los threads
-                    '-b:a', config.AUDIO_BITRATE,  # Bitrate fijo 320k
-                    '-ar', '48000',  # Sample rate 48kHz (alta calidad)
-                ]
-            },
-            # Solo opciones seguras, sin extractor_args que limitan formatos
-            'nocheckcertificate': True,
-            'socket_timeout': 30,
-            'http_headers': config.YTDLP_EXTRA_OPTS.get('http_headers', {}),
-        }
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+            response = await client.get(download_url)
+            response.raise_for_status()
+            
+            with open(output_path, 'wb') as f:
+                f.write(response.content)
         
-        # Add cookies
-        ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
-        
-        print(f"Downloading audio: {video.url}")
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video.url, download=True)
-        
-        title = info.get('title', 'audio')
-        clean_title = sanitize_filename(title)
+        # Extraer título del filename de Cobalt
+        clean_title = sanitize_filename(filename.replace('.mp3', '').replace('.m4a', ''))
+        if not clean_title:
+            clean_title = f"audio_{file_id[:8]}"
         
         # Store metadata
         file_metadata[file_id] = {
@@ -298,65 +295,70 @@ async def download_audio(video: VideoURL, request: Request, limit_status: dict =
             'type': 'audio'
         }
         
-        print(f"Download complete: {title}")
+        print(f"✅ Download complete: {clean_title}")
+        
+        # Obtener estado actualizado del límite
+        updated_status = rate_limiter.get_status(request)
             
         return {
             "file_id": file_id,
             "filename": f"{clean_title}.mp3",
-            "message": "Download completed successfully"
+            "message": "Download completed successfully",
+            "rate_limit": {
+                "remaining": updated_status["remaining"],
+                "total": updated_status["total"],
+                "reset_time": updated_status["reset_time"]
+            }
         }
         
     except Exception as e:
-        print(f"Error downloading: {str(e)}")
+        print(f"❌ Error downloading: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error downloading audio: {str(e)}")
 
 @app.post("/api/download-video")
 async def download_video(video: VideoURL, request: Request, limit_status: dict = Depends(check_rate_limit)):
-    """Download video from YouTube in high quality - OPTIMIZADO PARA MÁXIMA CALIDAD"""
+    """Download video from YouTube usando Cobalt API"""
     try:
         # Registrar la descarga
         rate_limiter.record_download(request)
         
         file_id = str(uuid.uuid4())
         
-        base_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',  # Formato flexible
-            'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
-            'concurrent_fragment_downloads': 5,
-            'retries': 10,
-            'fragment_retries': 10,
-            'http_chunk_size': 10485760,  # 10MB chunks
-            'merge_output_format': 'mp4',  # Asegurar que el output sea MP4
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',
-            }, {
-                'key': 'FFmpegMetadata',  # Preservar metadata
-            }],
-            'postprocessor_args': {
-                'ffmpeg': [
-                    '-threads', str(config.FFMPEG_THREADS),
-                ]
-            },
-            # Solo opciones seguras, sin extractor_args que limitan formatos
-            'nocheckcertificate': True,
-            'socket_timeout': 30,
-            'http_headers': config.YTDLP_EXTRA_OPTS.get('http_headers', {}),
-        }
+        print(f"🎬 Downloading video via Cobalt: {video.url}")
         
-        # Add cookies
-        ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
+        # Usar Cobalt API para obtener URL de descarga
+        cobalt_response = await cobalt_service.get_download_url(
+            url=video.url,
+            download_mode="auto",  # video + audio
+            video_quality="1080"
+        )
         
-        print(f"Downloading video: {video.url}")
+        if cobalt_response.get("status") == "error":
+            error_msg = cobalt_response.get("error", {}).get("message", "Error desconocido")
+            raise Exception(f"Cobalt error: {error_msg}")
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video.url, download=True)
+        download_url = cobalt_response.get("url")
+        filename = cobalt_response.get("filename", "video.mp4")
         
-        title = info.get('title', 'video')
-        clean_title = sanitize_filename(title)
+        if not download_url:
+            raise Exception("No se obtuvo URL de descarga")
+        
+        print(f"📥 Descargando desde: {download_url[:50]}...")
+        
+        # Descargar el archivo
+        output_path = DOWNLOADS_DIR / f"{file_id}.mp4"
+        
+        async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:
+            response = await client.get(download_url)
+            response.raise_for_status()
+            
+            with open(output_path, 'wb') as f:
+                f.write(response.content)
+        
+        # Extraer título del filename de Cobalt
+        clean_title = sanitize_filename(filename.replace('.mp4', '').replace('.webm', ''))
+        if not clean_title:
+            clean_title = f"video_{file_id[:8]}"
         
         # Store metadata
         file_metadata[file_id] = {
@@ -365,16 +367,24 @@ async def download_video(video: VideoURL, request: Request, limit_status: dict =
             'type': 'video'
         }
         
-        print(f"Video download complete: {title}")
+        print(f"✅ Video download complete: {clean_title}")
+        
+        # Obtener estado actualizado del límite
+        updated_status = rate_limiter.get_status(request)
             
         return {
             "file_id": file_id,
             "filename": f"{clean_title}.mp4",
-            "message": "Video download completed successfully"
+            "message": "Video download completed successfully",
+            "rate_limit": {
+                "remaining": updated_status["remaining"],
+                "total": updated_status["total"],
+                "reset_time": updated_status["reset_time"]
+            }
         }
         
     except Exception as e:
-        print(f"Error downloading video: {str(e)}")
+        print(f"❌ Error downloading video: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error downloading video: {str(e)}")
 
 @app.post("/api/separate-stems")

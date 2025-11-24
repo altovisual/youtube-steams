@@ -4,6 +4,7 @@ yt-dlp
 pydantic==2.5.0
 python-multipart==0.0.6
 requests
+httpx
 demucs
 torch
 torchaudio

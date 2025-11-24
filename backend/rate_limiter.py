@@ -80,8 +80,8 @@ class RateLimiter:
         return self.check_limit(request)
 
 
-# Instancia global - 5 descargas cada 24 horas
-rate_limiter = RateLimiter(max_downloads=5, window_hours=24)
+# Instancia global - 10 descargas cada 24 horas
+rate_limiter = RateLimiter(max_downloads=10, window_hours=24)
 
 
 def check_rate_limit(request: Request):

@@ -36,11 +36,12 @@ export default function VideoCard({ videoInfo }) {
       // Play success sound
       playSuccess()
       
-      // Show notification
+      // Show notification con info de límite
+      const rateLimit = response.data.rate_limit
       setNotification({
         show: true,
         type: 'audio',
-        message: 'Audio descargado exitosamente'
+        message: `Audio descargado exitosamente (${rateLimit.remaining}/${rateLimit.total} descargas restantes)`
       })
       
       // Auto download file
@@ -76,11 +77,12 @@ export default function VideoCard({ videoInfo }) {
       // Play complete sound
       playComplete()
       
-      // Show notification
+      // Show notification con info de límite
+      const rateLimit = response.data.rate_limit
       setNotification({
         show: true,
         type: 'video',
-        message: 'Video descargado exitosamente en HD'
+        message: `Video descargado exitosamente (${rateLimit.remaining}/${rateLimit.total} descargas restantes)`
       })
       
       // Auto download file

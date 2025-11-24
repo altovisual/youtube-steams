@@ -191,29 +191,73 @@ async def test_stems():
         "audio_files": audio_files[:5]  # Show first 5 files
     }
 
+def extract_video_id(url: str) -> Optional[str]:
+    """Extrae el ID del video de una URL de YouTube"""
+    patterns = [
+        r'(?:v=|/v/|youtu\.be/)([a-zA-Z0-9_-]{11})',
+        r'(?:embed/)([a-zA-Z0-9_-]{11})',
+        r'^([a-zA-Z0-9_-]{11})$'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+async def get_video_info_oembed(video_id: str) -> dict:
+    """Obtiene info del video usando YouTube oEmbed API (no requiere auth)"""
+    oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(oembed_url)
+        response.raise_for_status()
+        data = response.json()
+        
+        return {
+            "id": video_id,
+            "title": data.get("title", "Unknown"),
+            "artist": data.get("author_name", "Unknown"),
+            "thumbnail": f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
+            "duration": 0,  # oEmbed no proporciona duración
+            "view_count": 0,
+            "upload_date": None,
+            "description": "",
+        }
+
 @app.post("/api/video-info")
 async def get_video_info(video: VideoURL):
-    """Get video information including title, artist, thumbnail, duration"""
+    """Get video information - usa oEmbed como método principal (no requiere cookies)"""
     try:
+        print(f"Fetching info for URL: {video.url}")
+        
+        # Extraer video ID
+        video_id = extract_video_id(video.url)
+        if not video_id:
+            raise HTTPException(status_code=400, detail="URL de YouTube inválida")
+        
+        # Intentar primero con oEmbed (no requiere auth)
+        try:
+            video_info = await get_video_info_oembed(video_id)
+            print(f"✅ Video info retrieved via oEmbed: {video_info['title']}")
+            return video_info
+        except Exception as oembed_error:
+            print(f"⚠️ oEmbed failed: {oembed_error}, trying yt-dlp...")
+        
+        # Fallback a yt-dlp si oEmbed falla
         base_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
             'ignoreerrors': False,
             'no_color': True,
-            'noplaylist': True,  # IMPORTANTE: Solo descargar el video, no la playlist
+            'noplaylist': True,
             'skip_download': True,
-            'format': None,  # No especificar formato para solo obtener info
-            # Solo copiar opciones seguras de YTDLP_EXTRA_OPTS
-            'nocheckcertificate': config.YTDLP_EXTRA_OPTS.get('nocheckcertificate', True),
-            'socket_timeout': config.YTDLP_EXTRA_OPTS.get('socket_timeout', 30),
-            'http_headers': config.YTDLP_EXTRA_OPTS.get('http_headers', {}),
+            'format': None,
+            'nocheckcertificate': True,
+            'socket_timeout': 30,
         }
         
-        # Add cookies if configured
         ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
-        
-        print(f"Fetching info for URL: {video.url}")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video.url, download=False)
@@ -221,7 +265,6 @@ async def get_video_info(video: VideoURL):
             if not info:
                 raise HTTPException(status_code=400, detail="No se pudo obtener información del video")
             
-            # Extract relevant information
             video_info = {
                 "id": info.get('id'),
                 "title": info.get('title'),
@@ -233,11 +276,13 @@ async def get_video_info(video: VideoURL):
                 "description": (info.get('description') or '')[:200],
             }
             
-            print(f"Video info retrieved: {video_info['title']}")
+            print(f"✅ Video info retrieved via yt-dlp: {video_info['title']}")
             return video_info
             
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error fetching video info: {str(e)}")
+        print(f"❌ Error fetching video info: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Error al obtener información del video: {str(e)}")

@@ -48,15 +48,18 @@ YTDLP_EXTRA_OPTS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': {
-            # Usar múltiples clientes como fallback
-            'player_client': ['android_creator', 'android', 'ios', 'mweb'],
-            'player_skip': ['webpage', 'configs'],
-            'skip': ['hls', 'dash'],  # Skip formatos que requieren más verificación
+            # Usar clientes web que funcionan mejor (Nov 2024+)
+            'player_client': ['web', 'web_creator', 'web_embedded'],
+            'player_skip': ['configs'],
         }
     },
     # Opciones adicionales para evitar detección
     'socket_timeout': 30,
     'source_address': '0.0.0.0',  # Bind to all interfaces
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+    },
 }
 
 # Add proxy if configured

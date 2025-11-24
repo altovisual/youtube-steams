@@ -17,7 +17,7 @@ STEMS_DIR.mkdir(exist_ok=True)
 # YouTube Cookies configuration
 # Por defecto usa el archivo cookies.txt en el directorio backend
 YOUTUBE_COOKIES_FILE = os.getenv('YOUTUBE_COOKIES_FILE', str(BASE_DIR / 'cookies.txt'))
-YOUTUBE_COOKIES_BROWSER = os.getenv('YOUTUBE_COOKIES_BROWSER', None)  # chrome, firefox, etc.
+YOUTUBE_COOKIES_BROWSER = os.getenv('YOUTUBE_COOKIES_BROWSER', None)  # chrome, firefox, edge, etc.
 
 # Proxy configuration (para evitar bot detection)
 PROXY_URL = os.getenv('PROXY_URL', None)  # Ejemplo: http://user:pass@proxy.com:port
@@ -48,16 +48,16 @@ YTDLP_EXTRA_OPTS = {
     'nocheckcertificate': True,
     'extractor_args': {
         'youtube': {
-            # Usar clientes web que funcionan mejor (Nov 2024+)
-            'player_client': ['web', 'web_creator', 'web_embedded'],
-            'player_skip': ['configs'],
+            # Clientes que funcionan sin autenticación (Nov 2024+)
+            'player_client': ['tv_embedded', 'mediaconnect'],
+            'player_skip': ['webpage', 'configs'],
         }
     },
     # Opciones adicionales para evitar detección
     'socket_timeout': 30,
-    'source_address': '0.0.0.0',  # Bind to all interfaces
+    'source_address': '0.0.0.0',
     'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
     },
 }

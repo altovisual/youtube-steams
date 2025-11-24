@@ -36,14 +36,13 @@ def get_ytdlp_opts_with_cookies(base_opts: dict, use_proxy: bool = True) -> dict
     """Add cookies and proxy to yt-dlp options if configured"""
     opts = base_opts.copy()
     
-    # Try to use proxy first (más confiable que cookies)
-    if use_proxy and not config.PROXY_URL:
-        proxy = proxy_manager.get_random_proxy()
-        if proxy:
-            opts['proxy'] = proxy
-            print(f"🔄 Using public proxy: {proxy}")
+    # Solo usar proxy si está configurado explícitamente en config
+    # Los proxies públicos gratuitos no son confiables
+    if use_proxy and config.PROXY_URL:
+        opts['proxy'] = config.PROXY_URL
+        print(f"🔄 Using configured proxy")
     
-    # Check if cookies are in environment variable (for Render)
+    # Check if cookies are in environment variable (for Render/production)
     cookies_content = os.getenv('YOUTUBE_COOKIES')
     if cookies_content:
         try:
@@ -63,16 +62,16 @@ def get_ytdlp_opts_with_cookies(base_opts: dict, use_proxy: bool = True) -> dict
             print(f"❌ Error processing cookies from environment: {e}")
             import traceback
             traceback.print_exc()
-    # Add cookies from browser if configured
+    # For local development: use browser cookies if configured
     elif config.YOUTUBE_COOKIES_BROWSER:
         opts['cookiesfrombrowser'] = (config.YOUTUBE_COOKIES_BROWSER,)
-        print(f"Using cookies from browser: {config.YOUTUBE_COOKIES_BROWSER}")
-    # Or from file if configured
+        print(f"🍪 Using cookies from browser: {config.YOUTUBE_COOKIES_BROWSER}")
+    # Or from file if it exists
     elif config.YOUTUBE_COOKIES_FILE and Path(config.YOUTUBE_COOKIES_FILE).exists():
         opts['cookiefile'] = config.YOUTUBE_COOKIES_FILE
-        print(f"Using cookies from file: {config.YOUTUBE_COOKIES_FILE}")
+        print(f"🍪 Using cookies from file: {config.YOUTUBE_COOKIES_FILE}")
     else:
-        print("⚠️ No cookies configured - using only proxy")
+        print("⚠️ No cookies configured")
     
     return opts
 
@@ -190,7 +189,12 @@ async def get_video_info(video: VideoURL):
             'ignoreerrors': False,
             'no_color': True,
             'noplaylist': True,  # IMPORTANTE: Solo descargar el video, no la playlist
-            **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
+            'skip_download': True,
+            'format': None,  # No especificar formato para solo obtener info
+            # Solo copiar opciones seguras de YTDLP_EXTRA_OPTS
+            'nocheckcertificate': config.YTDLP_EXTRA_OPTS.get('nocheckcertificate', True),
+            'socket_timeout': config.YTDLP_EXTRA_OPTS.get('socket_timeout', 30),
+            'http_headers': config.YTDLP_EXTRA_OPTS.get('http_headers', {}),
         }
         
         # Add cookies if configured
@@ -232,8 +236,8 @@ async def download_audio(video: VideoURL):
         file_id = str(uuid.uuid4())
         output_path = DOWNLOADS_DIR / f"{file_id}.mp3"
         
-        ydl_opts = {
-            'format': config.YTDLP_FORMAT,  # Mejor formato de audio disponible
+        base_opts = {
+            'format': 'bestaudio/best',  # Formato flexible - mejor audio disponible
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': config.AUDIO_FORMAT,
@@ -256,8 +260,14 @@ async def download_audio(video: VideoURL):
                     '-ar', '48000',  # Sample rate 48kHz (alta calidad)
                 ]
             },
-            **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
+            # Solo opciones seguras, sin extractor_args que limitan formatos
+            'nocheckcertificate': True,
+            'socket_timeout': 30,
+            'http_headers': config.YTDLP_EXTRA_OPTS.get('http_headers', {}),
         }
+        
+        # Add cookies
+        ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
         
         print(f"Downloading audio: {video.url}")
         
@@ -292,8 +302,8 @@ async def download_video(video: VideoURL):
     try:
         file_id = str(uuid.uuid4())
         
-        ydl_opts = {
-            'format': config.VIDEO_FORMAT,  # Mejor video + audio disponible
+        base_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',  # Formato flexible
             'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
             'quiet': True,
             'no_warnings': True,
@@ -314,8 +324,14 @@ async def download_video(video: VideoURL):
                     '-threads', str(config.FFMPEG_THREADS),
                 ]
             },
-            **config.YTDLP_EXTRA_OPTS,  # Agregar opciones extra para evitar detección de bots
+            # Solo opciones seguras, sin extractor_args que limitan formatos
+            'nocheckcertificate': True,
+            'socket_timeout': 30,
+            'http_headers': config.YTDLP_EXTRA_OPTS.get('http_headers', {}),
         }
+        
+        # Add cookies
+        ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
         
         print(f"Downloading video: {video.url}")
         

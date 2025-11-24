@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ import re
 from datetime import datetime
 import config
 from proxy_manager import proxy_manager
+from rate_limiter import rate_limiter, check_rate_limit
 
 app = FastAPI(title="YouTube Music Downloader API")
 
@@ -111,6 +112,16 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "youtube-steams-backend"
+    }
+
+@app.get("/api/rate-limit-status")
+async def get_rate_limit_status(request: Request):
+    """Obtiene el estado actual del límite de descargas para el usuario"""
+    status = rate_limiter.get_status(request)
+    return {
+        "remaining": status["remaining"],
+        "total": status["total"],
+        "reset_time": status["reset_time"]
     }
 
 @app.get("/api/test-youtube")
@@ -230,9 +241,12 @@ async def get_video_info(video: VideoURL):
         raise HTTPException(status_code=400, detail=f"Error al obtener información del video: {str(e)}")
 
 @app.post("/api/download")
-async def download_audio(video: VideoURL):
+async def download_audio(video: VideoURL, request: Request, limit_status: dict = Depends(check_rate_limit)):
     """Download audio from YouTube video - OPTIMIZADO PARA MÁXIMA CALIDAD Y VELOCIDAD"""
     try:
+        # Registrar la descarga
+        rate_limiter.record_download(request)
+        
         file_id = str(uuid.uuid4())
         output_path = DOWNLOADS_DIR / f"{file_id}.mp3"
         
@@ -297,9 +311,12 @@ async def download_audio(video: VideoURL):
         raise HTTPException(status_code=400, detail=f"Error downloading audio: {str(e)}")
 
 @app.post("/api/download-video")
-async def download_video(video: VideoURL):
+async def download_video(video: VideoURL, request: Request, limit_status: dict = Depends(check_rate_limit)):
     """Download video from YouTube in high quality - OPTIMIZADO PARA MÁXIMA CALIDAD"""
     try:
+        # Registrar la descarga
+        rate_limiter.record_download(request)
+        
         file_id = str(uuid.uuid4())
         
         base_opts = {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Music2, Loader2 } from 'lucide-react'
 import UrlInput from './components/UrlInput'
 import VideoCard from './components/VideoCard'
+import RateLimitBadge from './components/RateLimitBadge'
 import { cn } from './lib/utils'
 
 function App() {
@@ -13,6 +14,11 @@ function App() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
+          {/* Rate Limit Badge */}
+          <div className="flex justify-end mb-4">
+            <RateLimitBadge />
+          </div>
+          
           <div className="flex items-center justify-center gap-3 mb-4">
             <Music2 className="w-12 h-12 text-white" />
             <h1 className="text-5xl font-bold text-white">

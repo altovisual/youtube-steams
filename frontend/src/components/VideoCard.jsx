@@ -45,8 +45,19 @@ export default function VideoCard({ videoInfo }) {
       
       // Auto download file
       window.open(API_ENDPOINTS.downloadFile(response.data.file_id), '_blank')
+      
+      // Disparar evento para actualizar el badge
+      window.dispatchEvent(new Event('download-complete'))
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al descargar el audio')
+      // Manejar error de límite alcanzado
+      if (err.response?.status === 429) {
+        const detail = err.response?.data?.detail
+        setError(detail?.message || 'Límite de descargas alcanzado. Vuelve más tarde.')
+      } else {
+        setError(err.response?.data?.detail || 'Error al descargar el audio')
+      }
+      // Disparar evento para actualizar el badge
+      window.dispatchEvent(new Event('download-complete'))
     } finally {
       setDownloading(false)
     }
@@ -74,8 +85,19 @@ export default function VideoCard({ videoInfo }) {
       
       // Auto download file
       window.open(API_ENDPOINTS.downloadVideoFile(response.data.file_id), '_blank')
+      
+      // Disparar evento para actualizar el badge
+      window.dispatchEvent(new Event('download-complete'))
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error al descargar el video')
+      // Manejar error de límite alcanzado
+      if (err.response?.status === 429) {
+        const detail = err.response?.data?.detail
+        setError(detail?.message || 'Límite de descargas alcanzado. Vuelve más tarde.')
+      } else {
+        setError(err.response?.data?.detail || 'Error al descargar el video')
+      }
+      // Disparar evento para actualizar el badge
+      window.dispatchEvent(new Event('download-complete'))
     } finally {
       setDownloadingVideo(false)
     }

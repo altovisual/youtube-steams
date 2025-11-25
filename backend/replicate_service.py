@@ -12,8 +12,8 @@ from pathlib import Path
 class ReplicateService:
     def __init__(self):
         self.base_url = "https://api.replicate.com/v1"
-        # Modelo de Demucs en Replicate (htdemucs - el más popular y estable)
-        self.model_version = "25a173108cff36ef9f80f854c162d01df9e6528be175794b81571f6c6c65c1f9"
+        # Modelo de Demucs en Replicate (htdemucs - versión correcta)
+        self.model_version = "25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953"
         
     @property
     def api_token(self):

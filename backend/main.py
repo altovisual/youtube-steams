@@ -16,6 +16,7 @@ import config
 from proxy_manager import proxy_manager
 from rate_limiter import rate_limiter, check_rate_limit
 from cobalt_service import cobalt_service
+from replicate_service import replicate_service
 
 app = FastAPI(title="YouTube Music Downloader API")
 
@@ -518,145 +519,162 @@ async def download_video(video: VideoURL, request: Request, limit_status: dict =
 
 @app.post("/api/separate-stems")
 async def separate_stems(request: SeparateRequest):
-    """Separate audio into stems using Demucs - OPTIMIZADO PARA MÁXIMA CALIDAD Y VELOCIDAD"""
+    """Separate audio into stems - Usa Replicate API (cloud GPU) o Demucs local"""
     print(f"\n{'='*60}")
     print(f"STEM SEPARATION REQUEST RECEIVED")
     print(f"{'='*60}")
-    print(f"Request data: {request}")
     print(f"file_id: {request.file_id}")
     print(f"two_stems: {request.two_stems}")
     
     try:
-        # Verificar si Demucs está instalado como módulo de Python
-        try:
-            import demucs
-            print(f"✓ Demucs module found: {demucs.__version__}")
-        except ImportError:
-            print("✗ Demucs module NOT found")
-            raise HTTPException(
-                status_code=400, 
-                detail="Demucs no está instalado. Por favor instala Demucs ejecutando: pip install demucs"
-            )
-        
         input_file = DOWNLOADS_DIR / f"{request.file_id}.mp3"
         
-        print(f"Looking for file: {input_file}")
-        print(f"File exists: {input_file.exists()}")
-        
         if not input_file.exists():
-            print(f"File not found: {input_file}")
+            print(f"❌ File not found: {input_file}")
             raise HTTPException(status_code=404, detail=f"Audio file not found: {request.file_id}.mp3")
         
         output_dir = STEMS_DIR / request.file_id
         output_dir.mkdir(exist_ok=True)
         
-        mode = "2 stems (vocals + instrumental)" if request.two_stems else "4 stems completos"
-        print(f"Starting stem separation for: {request.file_id} - Mode: {mode}")
+        stems = []
+        mode = "2 stems (vocals + instrumental)" if request.two_stems else "4 stems"
+        print(f"🎵 Mode: {mode}")
         
-        # Seleccionar modelo según el modo
+        # ========================================
+        # MÉTODO 1: Usar Replicate API (Cloud GPU)
+        # ========================================
+        if replicate_service.is_configured():
+            print("☁️ Intentando separación con Replicate API (Cloud GPU)...")
+            try:
+                # Necesitamos una URL pública del archivo
+                # Por ahora usamos el endpoint local (requiere que el servidor sea accesible)
+                backend_url = os.getenv('BACKEND_URL', 'https://youtube-steams-backend.onrender.com')
+                audio_url = f"{backend_url}/api/download-file/{request.file_id}"
+                
+                result = await replicate_service.separate_stems(
+                    audio_url=audio_url,
+                    two_stems=request.two_stems
+                )
+                
+                if result:
+                    print(f"✅ Replicate returned: {result}")
+                    # Descargar los stems del resultado
+                    for stem_name, stem_url in result.items():
+                        if stem_url and isinstance(stem_url, str):
+                            stem_path = output_dir / f"{stem_name}.mp3"
+                            if await replicate_service.download_stem(stem_url, stem_path):
+                                stems.append({
+                                    "name": stem_name,
+                                    "file_id": f"{request.file_id}/{stem_name}.mp3"
+                                })
+                    
+                    if stems:
+                        print(f"✅ Stems via Replicate: {[s['name'] for s in stems]}")
+                        return {
+                            "file_id": request.file_id,
+                            "stems": stems,
+                            "message": "Stems separated successfully (Cloud GPU)"
+                        }
+            except Exception as e:
+                print(f"⚠️ Replicate failed: {e}")
+        else:
+            print("⚠️ Replicate API not configured (set REPLICATE_API_TOKEN)")
+        
+        # ========================================
+        # MÉTODO 2: Demucs local (si hay suficiente RAM)
+        # ========================================
+        print("🖥️ Intentando separación local con Demucs...")
+        
+        try:
+            import demucs
+            print(f"✓ Demucs module found: {demucs.__version__}")
+        except ImportError:
+            raise HTTPException(
+                status_code=503, 
+                detail="Separación de stems no disponible. Configure REPLICATE_API_TOKEN para usar Cloud GPU."
+            )
+        
+        # Verificar memoria disponible (mínimo 1.5GB recomendado)
+        import psutil
+        available_memory_gb = psutil.virtual_memory().available / (1024**3)
+        print(f"📊 Available RAM: {available_memory_gb:.2f} GB")
+        
+        if available_memory_gb < 1.0:
+            raise HTTPException(
+                status_code=503,
+                detail="Memoria insuficiente para separación local. Configure REPLICATE_API_TOKEN para usar Cloud GPU."
+            )
+        
         model = config.DEMUCS_MODEL_FAST if request.two_stems else config.DEMUCS_MODEL_FULL
         
-        # Comando Demucs optimizado para velocidad usando Python
         import sys
         cmd = [
-            sys.executable,  # Usar el Python del entorno virtual
-            "-m", "demucs",  # Ejecutar demucs como módulo
-            "--mp3",  # Formato de salida MP3
-            "--mp3-bitrate", config.DEMUCS_BITRATE,  # 320 kbps
-            "-o", str(STEMS_DIR),  # Directorio de salida
-            "-n", model,  # Modelo según modo seleccionado
-            "--segment", str(config.DEMUCS_SEGMENT),  # Segmento (7.8 segundos máximo)
-            "-j", str(int(config.DEMUCS_JOBS)),  # Usar todos los cores (0 = auto)
+            sys.executable, "-m", "demucs",
+            "--mp3", "--mp3-bitrate", config.DEMUCS_BITRATE,
+            "-o", str(STEMS_DIR),
+            "-n", model,
+            "--segment", str(config.DEMUCS_SEGMENT),
+            "-j", "1",  # Usar solo 1 job para minimizar memoria
         ]
         
-        # Agregar opción de 2 stems si está activada (MUCHO MÁS RÁPIDO)
         if request.two_stems:
-            cmd.extend(["--two-stems", "vocals"])  # Solo separar vocals del resto
+            cmd.extend(["--two-stems", "vocals"])
         
         cmd.append(str(input_file))
         
-        print(f"Executing command: {' '.join(cmd)}")
+        print(f"🔧 Executing: {' '.join(cmd)}")
         
-        # Ejecutar Demucs con configuración optimizada
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Unknown error"
-                stdout_msg = stdout.decode() if stdout else ""
-                print(f"Demucs error (stderr): {error_msg}")
-                print(f"Demucs output (stdout): {stdout_msg}")
-                print(f"Return code: {process.returncode}")
-                
-                # Extraer el mensaje de error más relevante
-                if "usage:" in error_msg or "error:" in error_msg:
-                    # Es un error de argumentos
-                    error_lines = error_msg.split('\n')
-                    relevant_error = next((line for line in error_lines if 'error:' in line.lower()), error_msg)
-                    raise Exception(f"Error en argumentos de Demucs: {relevant_error}")
-                else:
-                    raise Exception(f"Demucs falló: {error_msg[:500]}")
-        except FileNotFoundError as e:
-            print(f"FileNotFoundError: {e}")
-            raise Exception(f"No se pudo ejecutar Python: {sys.executable}. Verifica la instalación.")
-        except Exception as e:
-            print(f"Exception during subprocess execution: {e}")
-            raise
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
         
-        print(f"Stem separation complete for: {request.file_id}")
+        stdout, stderr = await process.communicate()
         
-        # Buscar archivos separados (puede estar en diferentes ubicaciones según el modelo)
+        if process.returncode != 0:
+            error_msg = stderr.decode() if stderr else "Unknown error"
+            print(f"❌ Demucs error: {error_msg[:500]}")
+            raise Exception(f"Demucs falló: {error_msg[:200]}")
+        
+        # Buscar archivos generados
         possible_paths = [
             STEMS_DIR / model / request.file_id,
-            STEMS_DIR / config.DEMUCS_MODEL_FULL / request.file_id,
-            STEMS_DIR / config.DEMUCS_MODEL_FAST / request.file_id,
             STEMS_DIR / "htdemucs_ft" / request.file_id,
             STEMS_DIR / "htdemucs" / request.file_id,
         ]
         
-        stems = []
         stems_path = None
-        
         for path in possible_paths:
             if path.exists():
                 stems_path = path
                 break
         
-        if stems_path and stems_path.exists():
+        if stems_path:
             for stem_file in stems_path.glob("*.mp3"):
                 stems.append({
                     "name": stem_file.stem,
                     "file_id": f"{request.file_id}/{stem_file.name}"
                 })
-            
-            print(f"Found {len(stems)} stems: {[s['name'] for s in stems]}")
         
         if not stems:
             raise Exception("No stems were generated")
         
+        print(f"✅ Stems via Demucs local: {[s['name'] for s in stems]}")
+        
         return {
             "file_id": request.file_id,
             "stems": stems,
-            "message": "Stems separated successfully"
+            "message": "Stems separated successfully (Local)"
         }
         
-    except HTTPException as he:
-        # Re-raise HTTP exceptions as-is
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error separating stems: {str(e)}")
+        print(f"❌ Error separating stems: {str(e)}")
         import traceback
         traceback.print_exc()
-        error_detail = str(e)
-        if "No such file or directory" in error_detail:
-            error_detail = "Archivo de audio no encontrado. Asegúrate de descargar el audio primero."
-        raise HTTPException(status_code=400, detail=f"Error al separar stems: {error_detail}")
+        raise HTTPException(status_code=400, detail=f"Error al separar stems: {str(e)}")
 
 @app.get("/api/download-file/{file_id}")
 async def download_file(file_id: str):

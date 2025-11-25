@@ -323,24 +323,18 @@ async def download_audio_cobalt(video_url: str, file_id: str) -> tuple[Path, str
 def download_audio_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
     """Fallback: descarga audio usando yt-dlp con cookies"""
     base_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',  # Formato más flexible
+        'format': 'ba/b',  # ba = best audio, b = best (fallback más simple)
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '320',
         }],
         'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,  # Ver logs para debug
+        'no_warnings': False,
         'noplaylist': True,
         'nocheckcertificate': True,
-        'socket_timeout': 30,
-        # Usar cliente web que tiene más formatos disponibles
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'mweb'],
-            }
-        },
+        'socket_timeout': 60,
     }
     
     ydl_opts = get_ytdlp_opts_with_cookies(base_opts)
@@ -445,20 +439,14 @@ async def download_video_cobalt(video_url: str, file_id: str) -> tuple[Path, str
 def download_video_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
     """Fallback: descarga video usando yt-dlp con cookies"""
     base_opts = {
-        'format': 'bestvideo+bestaudio/best',  # Formato más flexible
+        'format': 'bv+ba/b',  # bv = best video, ba = best audio, b = best
         'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
         'noplaylist': True,
         'merge_output_format': 'mp4',
         'nocheckcertificate': True,
-        'socket_timeout': 30,
-        # Usar cliente web que tiene más formatos disponibles
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'mweb'],
-            }
-        },
+        'socket_timeout': 60,
     }
     
     ydl_opts = get_ytdlp_opts_with_cookies(base_opts)

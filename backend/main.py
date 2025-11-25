@@ -519,7 +519,7 @@ async def download_video(video: VideoURL, request: Request, limit_status: dict =
 
 @app.post("/api/separate-stems")
 async def separate_stems(request: SeparateRequest):
-    """Separate audio into stems - Usa Replicate API (cloud GPU) o Demucs local"""
+    """Separate audio into stems using Replicate API (cloud GPU)"""
     print(f"\n{'='*60}")
     print(f"STEM SEPARATION REQUEST RECEIVED")
     print(f"{'='*60}")
@@ -531,7 +531,7 @@ async def separate_stems(request: SeparateRequest):
         
         if not input_file.exists():
             print(f"❌ File not found: {input_file}")
-            raise HTTPException(status_code=404, detail=f"Audio file not found: {request.file_id}.mp3")
+            raise HTTPException(status_code=404, detail=f"Archivo de audio no encontrado. Descarga el audio primero.")
         
         output_dir = STEMS_DIR / request.file_id
         output_dir.mkdir(exist_ok=True)
@@ -540,132 +540,56 @@ async def separate_stems(request: SeparateRequest):
         mode = "2 stems (vocals + instrumental)" if request.two_stems else "4 stems"
         print(f"🎵 Mode: {mode}")
         
-        # ========================================
-        # MÉTODO 1: Usar Replicate API (Cloud GPU)
-        # ========================================
-        if replicate_service.is_configured():
-            print("☁️ Intentando separación con Replicate API (Cloud GPU)...")
-            try:
-                # Necesitamos una URL pública del archivo
-                # Por ahora usamos el endpoint local (requiere que el servidor sea accesible)
-                backend_url = os.getenv('BACKEND_URL', 'https://youtube-steams-backend.onrender.com')
-                audio_url = f"{backend_url}/api/download-file/{request.file_id}"
-                
-                result = await replicate_service.separate_stems(
-                    audio_url=audio_url,
-                    two_stems=request.two_stems
-                )
-                
-                if result:
-                    print(f"✅ Replicate returned: {result}")
-                    # Descargar los stems del resultado
-                    for stem_name, stem_url in result.items():
-                        if stem_url and isinstance(stem_url, str):
-                            stem_path = output_dir / f"{stem_name}.mp3"
-                            if await replicate_service.download_stem(stem_url, stem_path):
-                                stems.append({
-                                    "name": stem_name,
-                                    "file_id": f"{request.file_id}/{stem_name}.mp3"
-                                })
-                    
-                    if stems:
-                        print(f"✅ Stems via Replicate: {[s['name'] for s in stems]}")
-                        return {
-                            "file_id": request.file_id,
-                            "stems": stems,
-                            "message": "Stems separated successfully (Cloud GPU)"
-                        }
-            except Exception as e:
-                print(f"⚠️ Replicate failed: {e}")
-        else:
-            print("⚠️ Replicate API not configured (set REPLICATE_API_TOKEN)")
-        
-        # ========================================
-        # MÉTODO 2: Demucs local (si hay suficiente RAM)
-        # ========================================
-        print("🖥️ Intentando separación local con Demucs...")
-        
-        try:
-            import demucs
-            print(f"✓ Demucs module found: {demucs.__version__}")
-        except ImportError:
+        # Verificar que Replicate está configurado
+        if not replicate_service.is_configured():
+            print("❌ Replicate API not configured")
             raise HTTPException(
                 status_code=503, 
-                detail="Separación de stems no disponible. Configure REPLICATE_API_TOKEN para usar Cloud GPU."
+                detail="Separación de stems no disponible. El servicio no está configurado."
             )
         
-        # Verificar memoria disponible (mínimo 1.5GB recomendado)
-        import psutil
-        available_memory_gb = psutil.virtual_memory().available / (1024**3)
-        print(f"📊 Available RAM: {available_memory_gb:.2f} GB")
+        print("☁️ Separando con Replicate API (Cloud GPU)...")
         
-        if available_memory_gb < 1.0:
-            raise HTTPException(
-                status_code=503,
-                detail="Memoria insuficiente para separación local. Configure REPLICATE_API_TOKEN para usar Cloud GPU."
-            )
+        # URL pública del archivo de audio
+        backend_url = os.getenv('BACKEND_URL', 'https://youtube-steams-backend.onrender.com')
+        audio_url = f"{backend_url}/api/download-file/{request.file_id}"
+        print(f"📎 Audio URL: {audio_url}")
         
-        model = config.DEMUCS_MODEL_FAST if request.two_stems else config.DEMUCS_MODEL_FULL
-        
-        import sys
-        cmd = [
-            sys.executable, "-m", "demucs",
-            "--mp3", "--mp3-bitrate", config.DEMUCS_BITRATE,
-            "-o", str(STEMS_DIR),
-            "-n", model,
-            "--segment", str(config.DEMUCS_SEGMENT),
-            "-j", "1",  # Usar solo 1 job para minimizar memoria
-        ]
-        
-        if request.two_stems:
-            cmd.extend(["--two-stems", "vocals"])
-        
-        cmd.append(str(input_file))
-        
-        print(f"🔧 Executing: {' '.join(cmd)}")
-        
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+        result = await replicate_service.separate_stems(
+            audio_url=audio_url,
+            two_stems=request.two_stems
         )
         
-        stdout, stderr = await process.communicate()
+        if not result:
+            raise HTTPException(
+                status_code=500,
+                detail="Error en la separación de stems. Intenta de nuevo."
+            )
         
-        if process.returncode != 0:
-            error_msg = stderr.decode() if stderr else "Unknown error"
-            print(f"❌ Demucs error: {error_msg[:500]}")
-            raise Exception(f"Demucs falló: {error_msg[:200]}")
+        print(f"✅ Replicate returned: {result}")
         
-        # Buscar archivos generados
-        possible_paths = [
-            STEMS_DIR / model / request.file_id,
-            STEMS_DIR / "htdemucs_ft" / request.file_id,
-            STEMS_DIR / "htdemucs" / request.file_id,
-        ]
-        
-        stems_path = None
-        for path in possible_paths:
-            if path.exists():
-                stems_path = path
-                break
-        
-        if stems_path:
-            for stem_file in stems_path.glob("*.mp3"):
-                stems.append({
-                    "name": stem_file.stem,
-                    "file_id": f"{request.file_id}/{stem_file.name}"
-                })
+        # Descargar los stems del resultado
+        for stem_name, stem_url in result.items():
+            if stem_url and isinstance(stem_url, str) and stem_url.startswith('http'):
+                stem_path = output_dir / f"{stem_name}.mp3"
+                if await replicate_service.download_stem(stem_url, stem_path):
+                    stems.append({
+                        "name": stem_name,
+                        "file_id": f"{request.file_id}/{stem_name}.mp3"
+                    })
         
         if not stems:
-            raise Exception("No stems were generated")
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudieron descargar los stems generados."
+            )
         
-        print(f"✅ Stems via Demucs local: {[s['name'] for s in stems]}")
+        print(f"✅ Stems separados: {[s['name'] for s in stems]}")
         
         return {
             "file_id": request.file_id,
             "stems": stems,
-            "message": "Stems separated successfully (Local)"
+            "message": "Stems separated successfully"
         }
         
     except HTTPException:
@@ -674,7 +598,7 @@ async def separate_stems(request: SeparateRequest):
         print(f"❌ Error separating stems: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=400, detail=f"Error al separar stems: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al separar stems: {str(e)}")
 
 @app.get("/api/download-file/{file_id}")
 async def download_file(file_id: str):

@@ -33,6 +33,40 @@ app.add_middleware(
 DOWNLOADS_DIR = config.DOWNLOADS_DIR
 STEMS_DIR = config.STEMS_DIR
 
+# ============================================
+# KEEP-ALIVE: Evitar que Render ponga el servidor en sleep
+# ============================================
+KEEP_ALIVE_INTERVAL = 600  # 10 minutos en segundos
+keep_alive_task = None
+
+async def keep_alive_ping():
+    """Hace ping a sí mismo cada 10 minutos para evitar inactividad"""
+    backend_url = os.getenv('BACKEND_URL', 'https://youtube-steams-backend.onrender.com')
+    
+    while True:
+        await asyncio.sleep(KEEP_ALIVE_INTERVAL)
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(f"{backend_url}/")
+                print(f"🏓 Keep-alive ping: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ Keep-alive ping failed: {e}")
+
+@app.on_event("startup")
+async def start_keep_alive():
+    """Inicia el task de keep-alive al arrancar el servidor"""
+    global keep_alive_task
+    keep_alive_task = asyncio.create_task(keep_alive_ping())
+    print("✅ Keep-alive task started (ping every 10 minutes)")
+
+@app.on_event("shutdown")
+async def stop_keep_alive():
+    """Detiene el task de keep-alive al apagar el servidor"""
+    global keep_alive_task
+    if keep_alive_task:
+        keep_alive_task.cancel()
+        print("🛑 Keep-alive task stopped")
+
 # Store metadata for downloaded files
 file_metadata = {}
 

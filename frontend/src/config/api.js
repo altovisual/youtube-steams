@@ -12,5 +12,6 @@ export const API_ENDPOINTS = {
   downloadFile: (fileId) => `${API_BASE_URL}/api/download-file/${fileId}`,
   downloadVideoFile: (fileId) => `${API_BASE_URL}/api/download-video-file/${fileId}`,
   downloadStem: (fileId, stemName) => `${API_BASE_URL}/api/download-stem/${fileId}/${stemName}`,
-  rateLimitStatus: `${API_BASE_URL}/api/rate-limit-status`
+  rateLimitStatus: `${API_BASE_URL}/api/rate-limit-status`,
+  stemsLimitStatus: `${API_BASE_URL}/api/stems-limit-status`
 };

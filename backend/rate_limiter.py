@@ -83,6 +83,9 @@ class RateLimiter:
 # Instancia global - 10 descargas cada 24 horas
 rate_limiter = RateLimiter(max_downloads=10, window_hours=24)
 
+# Instancia para stems - 3 separaciones cada 24 horas (más restrictivo)
+stems_rate_limiter = RateLimiter(max_downloads=3, window_hours=24)
+
 
 def check_rate_limit(request: Request):
     """Dependency para verificar límite antes de descargar"""
@@ -93,7 +96,25 @@ def check_rate_limit(request: Request):
             status_code=429,
             detail={
                 "error": "Límite de descargas alcanzado",
-                "message": f"Has alcanzado el límite de {status['total']} descargas. Vuelve más tarde o suscríbete para descargas ilimitadas.",
+                "message": f"Has alcanzado el límite de {status['total']} descargas. Vuelve más tarde.",
+                "remaining": 0,
+                "reset_time": status["reset_time"]
+            }
+        )
+    
+    return status
+
+
+def check_stems_rate_limit(request: Request):
+    """Dependency para verificar límite antes de separar stems"""
+    status = stems_rate_limiter.check_limit(request)
+    
+    if not status["allowed"]:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Límite de separación alcanzado",
+                "message": f"Has alcanzado el límite de {status['total']} separaciones de stems por día. Vuelve mañana.",
                 "remaining": 0,
                 "reset_time": status["reset_time"]
             }

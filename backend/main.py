@@ -14,7 +14,7 @@ from datetime import datetime
 import httpx
 import config
 from proxy_manager import proxy_manager
-from rate_limiter import rate_limiter, check_rate_limit
+from rate_limiter import rate_limiter, check_rate_limit, stems_rate_limiter, check_stems_rate_limit
 from cobalt_service import cobalt_service
 from replicate_service import replicate_service
 
@@ -161,6 +161,16 @@ async def get_rate_limit_status(request: Request):
         "reset_time": status["reset_time"]
     }
 
+@app.get("/api/stems-limit-status")
+async def get_stems_limit_status(request: Request):
+    """Obtiene el estado actual del límite de separación de stems para el usuario"""
+    status = stems_rate_limiter.get_status(request)
+    return {
+        "remaining": status["remaining"],
+        "total": status["total"],
+        "reset_time": status["reset_time"]
+    }
+
 @app.get("/api/test-youtube")
 async def test_youtube():
     """Test endpoint to verify YouTube extraction works"""
@@ -248,13 +258,35 @@ async def get_video_info_oembed(video_id: str) -> dict:
         response.raise_for_status()
         data = response.json()
         
+        # Obtener duración y vistas usando yt-dlp (extracción rápida sin descarga)
+        duration = 0
+        view_count = 0
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': False,
+                'noplaylist': True,
+                'skip_download': True,
+                'format': None,
+                'socket_timeout': 15,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+                if info:
+                    duration = info.get('duration', 0) or 0
+                    view_count = info.get('view_count', 0) or 0
+                    print(f"📊 Metadata from yt-dlp: duration={duration}s, views={view_count}")
+        except Exception as e:
+            print(f"⚠️ Could not get duration/views from yt-dlp: {e}")
+        
         return {
             "id": video_id,
             "title": data.get("title", "Unknown"),
             "artist": data.get("author_name", "Unknown"),
             "thumbnail": f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
-            "duration": 0,  # oEmbed no proporciona duración
-            "view_count": 0,
+            "duration": duration,
+            "view_count": view_count,
             "upload_date": None,
             "description": "",
         }
@@ -552,13 +584,14 @@ async def download_video(video: VideoURL, request: Request, limit_status: dict =
         raise HTTPException(status_code=400, detail=f"Error downloading video: {str(e)}")
 
 @app.post("/api/separate-stems")
-async def separate_stems(request: SeparateRequest):
-    """Separate audio into stems using Replicate API (cloud GPU)"""
+async def separate_stems(request: SeparateRequest, http_request: Request, limit_status: dict = Depends(check_stems_rate_limit)):
+    """Separate audio into stems using Replicate API (cloud GPU) - Limited to 3/day per user"""
     print(f"\n{'='*60}")
     print(f"STEM SEPARATION REQUEST RECEIVED")
     print(f"{'='*60}")
     print(f"file_id: {request.file_id}")
     print(f"two_stems: {request.two_stems}")
+    print(f"stems_remaining: {limit_status['remaining']}")
     
     try:
         input_file = DOWNLOADS_DIR / f"{request.file_id}.mp3"
@@ -581,6 +614,9 @@ async def separate_stems(request: SeparateRequest):
                 status_code=503, 
                 detail="Separación de stems no disponible. El servicio no está configurado."
             )
+        
+        # Registrar uso de stems ANTES de procesar
+        stems_rate_limiter.record_download(http_request)
         
         print("☁️ Separando con Replicate API (Cloud GPU)...")
         

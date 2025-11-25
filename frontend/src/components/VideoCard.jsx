@@ -137,7 +137,13 @@ export default function VideoCard({ videoInfo }) {
     } catch (err) {
       console.error('Error separating stems:', err)
       console.error('Error response:', err.response?.data)
-      setError(err.response?.data?.detail || 'Error al separar los stems')
+      // Manejar error de límite alcanzado
+      if (err.response?.status === 429) {
+        const detail = err.response?.data?.detail
+        setError(detail?.message || 'Límite de separación de stems alcanzado. Vuelve mañana.')
+      } else {
+        setError(err.response?.data?.detail || 'Error al separar los stems')
+      }
     } finally {
       setSeparating(false)
     }

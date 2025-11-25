@@ -12,8 +12,8 @@ from pathlib import Path
 class ReplicateService:
     def __init__(self):
         self.base_url = "https://api.replicate.com/v1"
-        # Modelo de Demucs en Replicate (htdemucs - versión correcta)
-        self.model_version = "25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953"
+        # Modelo ryan5453/demucs - más actualizado y estable
+        self.model_version = "5a7041cc9b82e5a558fea6b3d7b12dea89625e89da33f0447bd727c2d0ab9e77"
         
     @property
     def api_token(self):
@@ -48,15 +48,18 @@ class ReplicateService:
             print(f"🔗 Audio URL: {audio_url}")
             
             async with httpx.AsyncClient(timeout=600) as client:
-                # Create prediction
+                # Parámetros para ryan5453/demucs
                 input_data = {
                     "audio": audio_url,
                     "output_format": output_format,
+                    "model": "htdemucs",  # Modelo base rápido
                 }
                 
-                # Si es two_stems, separar solo vocals
+                # Si es two_stems, solo separar vocals
                 if two_stems:
-                    input_data["stem"] = "vocals"
+                    input_data["stems"] = "vocals"
+                else:
+                    input_data["stems"] = "all"  # drums, bass, vocals, other
                 
                 print(f"📤 Sending to Replicate: {input_data}")
                 

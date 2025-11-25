@@ -323,7 +323,7 @@ async def download_audio_cobalt(video_url: str, file_id: str) -> tuple[Path, str
 def download_audio_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
     """Fallback: descarga audio usando yt-dlp con cookies"""
     base_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',  # Formato más flexible
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -335,16 +335,11 @@ def download_audio_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
         'noplaylist': True,
         'nocheckcertificate': True,
         'socket_timeout': 30,
-        # Opciones para bypass de bot detection
+        # Usar cliente web que tiene más formatos disponibles
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'web'],  # iOS client suele funcionar mejor
-                'player_skip': ['webpage', 'configs'],
+                'player_client': ['web', 'mweb'],
             }
-        },
-        'http_headers': {
-            'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
-            'Accept-Language': 'en-US,en;q=0.9',
         },
     }
     
@@ -450,7 +445,7 @@ async def download_video_cobalt(video_url: str, file_id: str) -> tuple[Path, str
 def download_video_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
     """Fallback: descarga video usando yt-dlp con cookies"""
     base_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+        'format': 'bestvideo+bestaudio/best',  # Formato más flexible
         'outtmpl': str(DOWNLOADS_DIR / f"{file_id}.%(ext)s"),
         'quiet': True,
         'no_warnings': True,
@@ -458,16 +453,11 @@ def download_video_ytdlp(video_url: str, file_id: str) -> tuple[Path, str]:
         'merge_output_format': 'mp4',
         'nocheckcertificate': True,
         'socket_timeout': 30,
-        # Opciones para bypass de bot detection
+        # Usar cliente web que tiene más formatos disponibles
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'web'],
-                'player_skip': ['webpage', 'configs'],
+                'player_client': ['web', 'mweb'],
             }
-        },
-        'http_headers': {
-            'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
-            'Accept-Language': 'en-US,en;q=0.9',
         },
     }
     
